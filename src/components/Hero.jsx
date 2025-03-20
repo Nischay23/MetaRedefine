@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { TiLocationArrow } from "react-icons/ti";
 import Button from "./Button";
 import { useGSAP } from "@gsap/react";
@@ -8,29 +8,60 @@ import { ScrollTrigger } from "gsap/all";
 gsap.registerPlugin(ScrollTrigger);
 
 const Hero = () => {
-  const [currentIndex, setcurrentIndex] = useState(1);
-  const [hasClicked, sethasClicked] = useState(false);
-  const [isLoading, setisLoading] = useState(true);
-  const [loadedVideos, setloadedVideos] = useState(1);
+  const [currentIndex, setCurrentIndex] = useState(1);
+  const [hasClicked, setHasClicked] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadedVideos, setLoadedVideos] = useState(new Set());
   const totalVideos = 5;
   const nextVideoRef = useRef(null);
+  const videoRefs = useRef([]);
+
+  const getVideoSrc = (index) => `videos/hero-${index}.mp4`;
+
+  const handleVideoLoad = useCallback((index) => {
+    setLoadedVideos((prev) => {
+      const next = new Set(prev);
+      next.add(index);
+      return next;
+    });
+  }, []);
+
+  // Preload all videos on mount
+  useEffect(() => {
+    const preloadVideos = () => {
+      for (let i = 1; i <= totalVideos; i++) {
+        const video = document.createElement("video");
+        video.src = getVideoSrc(i);
+        video.preload = "auto";
+        video.addEventListener("canplaythrough", () => handleVideoLoad(i));
+        video.style.display = "none";
+        document.body.appendChild(video);
+        videoRefs.current.push(video);
+      }
+    };
+
+    preloadVideos();
+
+    return () => {
+      videoRefs.current.forEach((video) => video.remove());
+    };
+  }, [handleVideoLoad]);
+
+  // Handle loading state
+  useEffect(() => {
+    if (loadedVideos.size >= totalVideos) {
+      setIsLoading(false);
+    }
+  }, [loadedVideos, totalVideos]);
 
   const nextVideoIndex = (currentIndex % totalVideos) + 1;
 
   const handleMiniVDClick = () => {
-    sethasClicked(true);
-    setcurrentIndex(nextVideoIndex);
-  };
-
-  const handleVideoLoad = () => {
-    setloadedVideos((prevLoadedVideos) => prevLoadedVideos + 1);
-  };
-
-  useEffect(() => {
-    if (loadedVideos < totalVideos - 1) {
-      setisLoading(false);
+    if (!isLoading) {
+      setHasClicked(true);
+      setCurrentIndex(nextVideoIndex);
     }
-  }, [loadedVideos]);
+  };
 
   useGSAP(
     () => {
@@ -38,17 +69,19 @@ const Hero = () => {
         gsap.set("#next-video", { visibility: "visible" });
 
         gsap.to("#next-video", {
-          transformOrigin: "center center",
           scale: 1,
           width: "100%",
           height: "100%",
           duration: 1,
           ease: "power1.inOut",
-          onStart: () => nextVideoRef.current.play(),
+          onStart: () => {
+            if (nextVideoRef.current) {
+              nextVideoRef.current.play().catch(() => {});
+            }
+          },
         });
 
         gsap.from("#current-video", {
-          transformOrigin: "center center",
           scale: 0,
           duration: 1,
           ease: "power1.inOut",
@@ -77,13 +110,10 @@ const Hero = () => {
     });
   });
 
-  const getVideoSrc = (index) => `videos/hero-${index}.mp4`;
-
   return (
     <div className="relative h-dvh w-screen overflow-x-hidden">
-      {/* Loading Spinner */}
       {isLoading && (
-        <div className="flex-center absolute z-[100] h-dvh w-screen overflow-hidden bg-violet-50">
+        <div className="flex-center absolute z-[100] h-dvh w-screen bg-violet-50">
           <div className="three-body">
             <div className="three-body__dot" />
             <div className="three-body__dot" />
@@ -92,13 +122,11 @@ const Hero = () => {
         </div>
       )}
 
-      {/* Main Container */}
       <div
         id="video-frame"
         className="relative z-10 h-dvh w-screen overflow-hidden rounded-lg bg-blue-75"
       >
         <div>
-          {/* Mini Video (clickable) */}
           <div className="mask-clip-path absolute-center absolute z-50 size-64 cursor-pointer overflow-hidden rounded-lg">
             <div
               onClick={handleMiniVDClick}
@@ -107,56 +135,45 @@ const Hero = () => {
               <video
                 ref={nextVideoRef}
                 src={getVideoSrc(nextVideoIndex)}
+                preload="auto"
                 loop
                 muted
                 id="current-video"
                 className="size-64 origin-center scale-150 object-cover object-center"
-                onLoadedData={handleVideoLoad}
+                onCanPlayThrough={() => handleVideoLoad(nextVideoIndex)}
               />
             </div>
           </div>
 
-          {/* Animated Background Video */}
           <video
             ref={nextVideoRef}
             src={getVideoSrc(currentIndex)}
+            preload="auto"
             loop
             muted
             id="next-video"
-            className="absolute-center invisible absolute z-20
-           size-64 object-cover object-center"
-            onLoadedData={handleVideoLoad}
+            className="absolute-center invisible absolute z-20 size-64 object-cover object-center"
+            onCanPlayThrough={() => handleVideoLoad(currentIndex)}
           />
 
-          {/* Main Background Video */}
           <video
-            src={getVideoSrc(
-              currentIndex === totalVideos - 1 ? 1 : currentIndex
-            )}
+            src={getVideoSrc(currentIndex)}
             autoPlay
             loop
             muted
+            preload="auto"
             className="absolute left-0 top-0 size-full object-cover object-center"
-            onLoadedData={handleVideoLoad}
+            onCanPlayThrough={() => handleVideoLoad(currentIndex)}
           />
         </div>
 
-        {/* First Gaming Heading (blue text) */}
-        <h1
-          className="
-            special-font hero-heading absolute bottom-5 right-5 z-40
-            text-blue-75 font-bold
-            transition-all duration-300
-            hover:drop-shadow-[0_0_10px_rgba(255,255,0,0.8)]
-          "
-        >
+        <h1 className="special-font hero-heading absolute bottom-5 right-5 z-40 text-blue-75 font-bold hover:drop-shadow-[0_0_10px_rgba(255,255,0,0.8)]">
           <b>
             Ga<span className="text-yellow-500">m</span>ing
           </b>
         </h1>
 
-        {/* Overlay Content */}
-        <div className=" absolute left-0 top-0 z-40 size-full">
+        <div className="absolute left-0 top-0 z-40 size-full">
           <div className="mt-24 px-5 sm:px-10">
             <h1 className="special-font hero-heading text-blue-100">
               re<b>d</b>efi<b>n</b>e
@@ -176,16 +193,8 @@ const Hero = () => {
         </div>
       </div>
 
-      {/* Second Gaming Heading (black text) */}
-      <h1
-        className="
-          special-font hero-heading absolute bottom-5 right-5 text-black font-bold
-          transition-all duration-300
-          hover:drop-shadow-[0_0_10px_rgba(255,255,0,0.8)]
-        "
-      >
+      <h1 className="special-font hero-heading absolute bottom-5 right-5 text-black font-bold hover:drop-shadow-[0_0_10px_rgba(255,255,0,0.8)]">
         <b>
-          {" "}
           Ga<span className="text-yellow-500">m</span>ing
         </b>
       </h1>
