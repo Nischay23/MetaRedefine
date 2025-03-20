@@ -47,9 +47,9 @@ const Hero = () => {
     };
   }, [handleVideoLoad]);
 
-  // Handle loading state
+  // Handle loading state - now only waiting for 3 video loads
   useEffect(() => {
-    if (loadedVideos.size >= totalVideos) {
+    if (loadedVideos.size >= 3) {
       setIsLoading(false);
     }
   }, [loadedVideos, totalVideos]);
@@ -72,8 +72,8 @@ const Hero = () => {
           scale: 1,
           width: "100%",
           height: "100%",
-          duration: 1,
-          ease: "power1.inOut",
+          duration: 0.7, // decreased duration for smoother transition
+          ease: "power2.out", // smoother easing
           onStart: () => {
             if (nextVideoRef.current) {
               nextVideoRef.current.play().catch(() => {});
@@ -83,8 +83,8 @@ const Hero = () => {
 
         gsap.from("#current-video", {
           scale: 0,
-          duration: 1,
-          ease: "power1.inOut",
+          duration: 0.7, // decreased duration
+          ease: "power2.out", // smoother easing
         });
       }
     },
