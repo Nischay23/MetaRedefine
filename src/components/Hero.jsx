@@ -24,7 +24,16 @@ const Hero = () => {
   };
 
   useEffect(() => {
-    if (loadedVideos < totalVideos - 1) {
+    // Preload all videos on component mount
+    for (let i = 1; i <= totalVideos; i++) {
+      const video = document.createElement("video");
+      video.src = getVideoSrc(i);
+      video.preload = "auto";
+    }
+  }, []);
+
+  useEffect(() => {
+    if (loadedVideos >= 3) {
       setLoading(false);
     }
   }, [loadedVideos]);
@@ -80,7 +89,7 @@ const Hero = () => {
     });
   });
 
-  const getVideoSrc = (index) => `videos/hero-${index}.mp4`;
+  const getVideoSrc = (index) => `/videos/hero-${index}.mp4`;
 
   return (
     <div className="relative h-dvh w-screen overflow-x-hidden">
